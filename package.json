@@ -1,0 +1,57 @@
+{
+  "name": "opencode-roadmap-plugin",
+  "version": "1.0.0",
+  "description": "Generate comprehensive product roadmaps in opencode via a 4-phase pipeline (Discovery → Competitor → Features → Critic). Adds /roadmap slash command and 4 specialized subagents.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "agents",
+    "commands",
+    "opencode.json.example",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "roadmap",
+    "product-roadmap",
+    "ai-agents",
+    "minimax",
+    "claude",
+    "ai-tools"
+  ],
+  "author": "islamahmedas12-ux",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/islamahmedas12-ux/opencode-roadmap-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/islamahmedas12-ux/opencode-roadmap-plugin/issues"
+  },
+  "homepage": "https://github.com/islamahmedas12-ux/opencode-roadmap-plugin#readme",
+  "peerDependencies": {
+    "@opencode-ai/plugin": "^1.0.0"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "^1.14.46",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

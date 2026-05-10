@@ -1,16 +1,18 @@
 # opencode-roadmap-plugin
 
-Generate a comprehensive product roadmap for any project — using [opencode](https://opencode.ai/) as the harness, with Aperant-quality output at MiniMax-M2.7 cost.
+A real [opencode](https://opencode.ai/) plugin that generates comprehensive product roadmaps for any project — using a 4-phase pipeline (**Discovery → Competitor → Features → Critic**) with Aperant-quality output.
 
-A 4-phase pipeline: **Discovery → Competitor Analysis → Features → Critic Refinement**. Output is a structured `roadmap.json` with 15-20 prioritized features, each with 6+ acceptance criteria, 3+ user stories, and links to specific competitor pain points.
+When loaded, the plugin auto-installs the `/roadmap` slash command and 4 specialized subagents into your opencode configuration.
 
 ## What you get
+
+A single command `/roadmap` that produces:
 
 ```
 .auto-build/roadmap/
 ├── roadmap_discovery.json     ← project understanding (audience, vision, gaps)
 ├── competitor_analysis.json   ← 5 competitors with real pain points & sources
-└── roadmap.json               ← 15-20 prioritized features in 4 phases
+└── roadmap.json               ← 15-20 prioritized features, 4 phases
 ```
 
 Each feature includes:
@@ -18,92 +20,96 @@ Each feature includes:
 - Complexity & impact scores
 - 6+ specific, testable acceptance criteria (HTTP codes, timeouts, algorithms)
 - 3+ user stories ("As a X, I want Y so that Z")
-- Rationale linked to specific competitor pain points or discovery insights
+- Rationale linked to specific competitor pain points / discovery insights
 
-## Why this exists
+## Why it's a real plugin
 
-Inspired by [Aperant](https://github.com/AndyMik90/Aperant)'s "Generate Roadmap" feature. Aperant is an Electron app that uses Claude Code + Vercel AI SDK. This plugin delivers comparable output quality through opencode's subagent system, with two notable differences:
+Earlier versions shipped as just markdown files. This version is a proper opencode plugin:
+- Appears in opencode's **Plugins** tab (alongside `oh-my-openagent`, etc.)
+- Loaded automatically when opencode starts
+- Installs and updates agent/command files automatically
+- Versioned, distributable via npm or GitHub
 
-1. **Model agnostic** — works with any opencode-supported model (Claude, MiniMax, GPT, etc.)
-2. **Cheaper** — MiniMax-M2.7 produces ~85% the depth at ~10% the cost
-3. **Native opencode** — no separate UI; works inside the opencode TUI you already use
+## Install
 
-## Quick start
+### Option 1: From GitHub (recommended for now)
 
-### 1. Install opencode
+Add to `~/.config/opencode/opencode.json`:
 
-If you haven't already: https://opencode.ai/
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    "github:islamahmedas12-ux/opencode-roadmap-plugin"
+  ]
+}
+```
 
-### 2. Install the plugin
+opencode runs `bun install` automatically — the plugin will be fetched and loaded next time you start opencode.
+
+### Option 2: From npm (when published)
+
+```json
+{
+  "plugin": [
+    "opencode-roadmap-plugin"
+  ]
+}
+```
+
+### Option 3: Manual install (legacy)
+
+If you prefer not to use the plugin system, you can manually copy the agents and command:
 
 ```bash
-git clone https://github.com/<your-username>/opencode-roadmap-plugin.git
+git clone https://github.com/islamahmedas12-ux/opencode-roadmap-plugin.git
 cd opencode-roadmap-plugin
 ./install.sh
 ```
 
-This copies agents to `~/.config/opencode/agents/` and the command to `~/.config/opencode/commands/`.
+This copies files to `~/.config/opencode/agents/` and `~/.config/opencode/commands/` directly.
 
-### 3. Configure model + MCP
+## Recommended config
 
-Copy `opencode.json.example` and edit for your environment:
+To get the best results, also configure the **context7** MCP server (for up-to-date library docs the agents can query):
 
-**Using MiniMax (cheap, recommended)**:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
+  "plugin": ["github:islamahmedas12-ux/opencode-roadmap-plugin"],
   "mcp": {
     "context7": {
       "type": "remote",
       "url": "https://mcp.context7.com/mcp",
       "enabled": true
     }
-  },
-  "provider": {
-    "anthropic": {
-      "options": {
-        "baseURL": "https://api.minimax.io/anthropic",
-        "apiKey": "{env:MINIMAX_API_KEY}"
-      },
-      "models": {
-        "MiniMax-M2.7": {}
-      }
-    }
   }
 }
 ```
 
-Set the env var:
-```bash
-export MINIMAX_API_KEY=your_key_here
-```
+## Usage
 
-**Using Claude (highest quality)**: just use opencode's default Anthropic config. No changes needed.
+In opencode (TUI or web), inside any project directory:
 
-### 4. Run
-
-In any project directory:
-```bash
-opencode
-```
-
-Then in opencode:
 ```
 /roadmap
 ```
 
-Or skip competitor research (faster, no internet):
+Or skip the competitor analysis phase (faster, no internet research):
+
 ```
 /roadmap --no-competitor
 ```
 
+The pipeline takes 12-18 minutes depending on model and project size. Output appears in `.auto-build/roadmap/` in the current project.
+
 ## How it works
 
 ```
-User runs /roadmap in opencode
+User runs /roadmap
         │
         ▼
-Primary agent reads the slash command, then:
+Primary agent reads the slash command file, then invokes:
         │
         ├──► Task(roadmap-discovery) ──► roadmap_discovery.json
         │
@@ -117,29 +123,68 @@ Primary agent reads the slash command, then:
                 (strengthens weak features, adds missing ones)
 ```
 
-Each subagent is isolated:
-- Has its own context window
-- Has its own permissions (deny edit/bash where unnecessary)
-- Has its own system prompt with strict depth requirements
+Each subagent runs in isolation with its own context window, model, and tool permissions.
+
+## Model recommendations
+
+The plugin doesn't hardcode a model — agents inherit from your primary opencode agent. For best results:
+
+- **Claude Sonnet 4.6 / Opus 4.7** — highest quality, ~$2-3/run, 16 min
+- **MiniMax-M2.7** — ~85% quality at ~10% cost (~$0.30/run, 12 min)
+- **GPT-5 / GPT-5-mini** — good middle ground
+
+To use a specific model for the roadmap subagents, edit them post-install:
+
+```bash
+# After plugin loads agents to ~/.config/opencode/agents/
+sed -i '/^description:/a model: minimax/MiniMax-M2.7' ~/.config/opencode/agents/roadmap-*.md
+```
+
+## Performance benchmarks
+
+| Project | Phases | Features | Avg AC/feat | Time | Cost |
+|---|---|---|---|---|---|
+| AuthMe (NestJS IAM) | 4 | 15-20 | 7-8 | ~12 min | ~$0.30 |
+| Real Estate CRM (NestJS+React+Flutter) | 4 | 16-20 | 7-9 | ~13 min | ~$0.35 |
+| Commander.js (Node CLI lib) | 4 | 15 | 6-7 | ~8 min | ~$0.20 |
+
+For comparison: Aperant + Claude Sonnet 4.6 produces ~10 AC/feat at ~$2-3/run in ~15-16 min.
 
 ## File structure
 
 ```
 opencode-roadmap-plugin/
-├── agents/
-│   ├── roadmap-discovery.md      ← Phase 1 subagent
-│   ├── competitor-analysis.md    ← Phase 2 subagent
-│   ├── roadmap-features.md       ← Phase 3 subagent
-│   └── roadmap-critic.md         ← Phase 4 subagent
+├── src/
+│   └── index.ts                  ← plugin entry point (TypeScript)
+├── dist/                         ← built output (npm-publishable)
+│   ├── index.js
+│   └── index.d.ts
+├── agents/                       ← markdown agent definitions
+│   ├── roadmap-discovery.md
+│   ├── competitor-analysis.md
+│   ├── roadmap-features.md
+│   └── roadmap-critic.md
 ├── commands/
-│   └── roadmap.md                 ← /roadmap orchestrator
-├── opencode.json.example          ← config template
-├── install.sh                     ← installer
-├── LICENSE                        ← AGPL-3.0
+│   └── roadmap.md                ← /roadmap slash command
+├── opencode.json.example         ← config template
+├── install.sh                    ← manual install (legacy alternative)
+├── package.json
+├── tsconfig.json
+├── LICENSE                       ← AGPL-3.0
 └── README.md
 ```
 
-## Output schema
+## Plugin internals
+
+The plugin entry (`src/index.ts`) does two things at load time:
+
+1. **Syncs markdown assets** — copies `agents/*.md` and `commands/*.md` from the package to `~/.config/opencode/agents/` and `~/.config/opencode/commands/` so they're picked up by opencode's normal discovery mechanism.
+
+2. **Registers a `shell.env` hook** — sets `OPENCODE_ROADMAP_PLUGIN_VERSION` env var so the plugin shows up in opencode's plugin list and version is observable.
+
+The actual roadmap generation logic lives in the markdown subagents (see `agents/`) — the plugin is just the loader.
+
+## Output schemas
 
 ### roadmap_discovery.json
 ```json
@@ -185,43 +230,31 @@ opencode-roadmap-plugin/
 }
 ```
 
-## Performance
+## Development
 
-Benchmarks on real projects (with MiniMax-M2.7):
+```bash
+git clone https://github.com/islamahmedas12-ux/opencode-roadmap-plugin.git
+cd opencode-roadmap-plugin
+npm install
+npm run build
+```
 
-| Project | Phases | Features | Avg AC/feat | Time | Cost |
-|---|---|---|---|---|---|
-| AuthMe (NestJS IAM, 5K+ files) | 4 | 20 | 8.4 | ~12 min | ~$0.30 |
-| Real Estate CRM (NestJS+React+Flutter) | 4 | 20 | 6.9 | ~13 min | ~$0.35 |
-| Commander.js (Node CLI library) | 4 | 15 | 6+ | ~8 min | ~$0.20 |
-
-For comparison: Aperant + Claude Sonnet 4.6 produces ~10 AC/feat at ~$2-3/run in ~15-16 min.
-
-## Tips
-
-- **Run on a fresh project**: phases skip if output files already exist. Delete `.auto-build/roadmap/` to regenerate.
-- **Use `--no-competitor`** if your project is in a niche without obvious competitors, or you don't want web research.
-- **Improve quality**: re-run critic phase manually via `@roadmap-critic` to do another refinement pass.
-- **Customize**: edit `agents/roadmap-features.md` to change priority distribution or feature count targets.
+The build produces `dist/index.js` from `src/index.ts`. Both `dist/` and the markdown source files are committed so the GitHub installation path works without a separate build step.
 
 ## Troubleshooting
 
-**`/roadmap` not found**: Make sure you ran `./install.sh` and `~/.config/opencode/commands/roadmap.md` exists.
+**Plugin doesn't appear in opencode's Plugins tab**: ensure `opencode.json` has `"plugin": ["github:islamahmedas12-ux/opencode-roadmap-plugin"]` and restart opencode. The first launch will run `bun install` (may take 30s).
 
-**"Subagent not found"**: Check `~/.config/opencode/agents/` has all 4 `.md` files.
+**`/roadmap` command not found**: check `~/.config/opencode/commands/roadmap.md` exists. The plugin should create this on load — if missing, check opencode's startup logs for plugin errors.
 
-**MCP context7 errors**: Free tier has rate limits. Get a free API key at https://context7.com/dashboard and add to your config.
+**MCP context7 errors**: free tier has rate limits. Get a free API key at https://context7.com/dashboard.
 
-**Output too generic**: Re-run with `@roadmap-critic` for another refinement pass. Or check that your model is at least Sonnet/Opus level (small models struggle with depth).
-
-**Phase fails mid-way**: Check `.auto-build/roadmap/` for partial outputs. The pipeline can resume — just re-run `/roadmap`.
+**Output too generic**: ensure your model is at least Sonnet/Opus level. Small models struggle with the depth requirements. You can also re-run just the critic via `@roadmap-critic` for another refinement pass.
 
 ## Credits
 
-The prompts are derived from [Aperant](https://github.com/AndyMik90/Aperant) (formerly Auto-Claude) by [@AndyMik90](https://github.com/AndyMik90), licensed AGPL-3.0. This plugin extends them for opencode and adds explicit depth directives, a critic refinement phase, and stricter schema validation.
+The agent prompts are derived from [Aperant](https://github.com/AndyMik90/Aperant) (formerly Auto-Claude) by [@AndyMik90](https://github.com/AndyMik90), licensed AGPL-3.0. This plugin extends them for opencode and adds explicit depth directives, a critic refinement phase, and stricter schema validation.
 
 ## License
 
 AGPL-3.0 — derivative of Aperant. See [LICENSE](./LICENSE).
-
-If you modify and distribute, or run as a service, your code must also be open source under AGPL-3.0.

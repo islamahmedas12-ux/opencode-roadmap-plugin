@@ -1,9 +1,13 @@
-# Source prompts (from Aperant) — used during development, not part of the package
+# Source prompts (development reference)
 _source_*.md
 
 # Test outputs
 .auto-build/
 runs/
+
+# Node
+node_modules/
+*.tgz
 
 # Editor files
 .vscode/
