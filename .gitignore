@@ -1,0 +1,16 @@
+# Source prompts (from Aperant) — used during development, not part of the package
+_source_*.md
+
+# Test outputs
+.auto-build/
+runs/
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Temp
+*.tmp
+*.log
