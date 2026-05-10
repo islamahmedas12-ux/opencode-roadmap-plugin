@@ -1,26 +1,26 @@
 ---
-description: Generate AI-powered improvement ideas across 6 dimensions (code, UI/UX, docs, security, performance, code quality). Each type produces actionable ideas tied to the project's actual code.
+description: Generate AI-powered improvement ideas across 6 dimensions (code, UI/UX, docs, security, performance, code quality), and PRINT each idea in detail in the chat.
 agent: build
 ---
 
 # /ideation — Generate Project Improvement Ideas
 
-You are the orchestrator for a 6-type ideation pipeline. Each type produces a JSON file with actionable improvement ideas for the current project.
+You are the orchestrator for a 6-type ideation pipeline. **CRITICAL CHAT-OUTPUT RULE**: after each ideation type completes, you MUST print every idea generated to the chat in detail (not just "done"). The user wants the content in the conversation context for follow-up questions, not just files on disk.
 
 ## Configuration
 
 Project directory: `!`pwd``
 Output directory: `!`pwd`/.auto-build/ideation`
-Max ideas per type: 5 (default)
+Default max ideas per type: 5
 
 ## Argument parsing
 
 `$ARGUMENTS` may contain:
-- `nothing` → run all 6 ideation types
-- A space-separated list of types to run, e.g. `security performance` → run only those
+- `nothing` → run all 6 types
+- A space-separated list of type names → run only those
 - `--max=N` → override max ideas per type
 
-Valid type names (use these exactly):
+Valid type names:
 - `code_improvements`
 - `code_quality`
 - `documentation`
@@ -28,7 +28,7 @@ Valid type names (use these exactly):
 - `security`
 - `ui_ux`
 
-Subagent names are mapped:
+Subagent mapping:
 - `code_improvements` → `@ideation-code-improvements`
 - `code_quality` → `@ideation-code-quality`
 - `documentation` → `@ideation-documentation`
@@ -36,7 +36,7 @@ Subagent names are mapped:
 - `security` → `@ideation-security`
 - `ui_ux` → `@ideation-ui-ux`
 
-Output file mapping:
+Output filename mapping:
 - `code_improvements` → `code_improvements_ideas.json`
 - `code_quality` → `code_quality_ideas.json`
 - `documentation` → `documentation_gaps_ideas.json`
@@ -48,20 +48,21 @@ Output file mapping:
 
 ### Step 1: Setup
 
-Create the output directory:
 ```bash
 mkdir -p .auto-build/ideation
 ```
 
-Determine the list of types to run from `$ARGUMENTS`. If empty or no valid types found, run all 6.
+Determine the list of types to run from `$ARGUMENTS`. If empty or no valid types, run all 6.
+Determine `<max_ideas>` from `$ARGUMENTS` (look for `--max=N`); default 5.
 
-Determine `<max_ideas>` from `$ARGUMENTS` (look for `--max=N`); default to 5.
+State which types you'll run and the max-ideas value:
+```
+Running ideation for: <list of types>  ·  Max ideas per type: <max_ideas>
+```
 
 ### Step 2: Run each ideation type SEQUENTIALLY
 
-For each enabled type, invoke the corresponding subagent using the **Task tool**.
-
-Pass this context block to each subagent:
+For each enabled type, invoke the matching subagent via the **Task tool** with this context:
 
 ```
 Project Directory: <project_dir>
@@ -71,60 +72,62 @@ Max Ideas: <max_ideas>
 
 Analyze the project and generate up to <max_ideas> high-quality, specific, actionable ideas of type "<type_name>".
 
-Use the available tools (Read, Glob, Grep, Bash) to explore the codebase. Read the project_index.json if it exists, plus README, package.json/equivalent, and key source files.
+Use Read, Glob, Grep, Bash to explore the codebase. Read project_index.json (if it exists), README, package.json/equivalent, and key source files.
 
 DEPTH REQUIREMENTS:
-- Each idea must be SPECIFIC and ACTIONABLE — not generic ("improve testing" is bad; "add Jest snapshot tests for the 12 components in src/components/forms/" is good)
+- Each idea must be SPECIFIC and ACTIONABLE — generic ideas like "improve testing" will be rejected
 - Each idea must reference specific files, functions, or patterns observed in the code
 - Each idea's `rationale` must explain why the code reveals this opportunity
 - Each idea's `affected_files` must list real file paths from the project
-- Use the schema and effort levels defined in your system prompt
+- Use the schema and effort levels in your system prompt
 
 Use the Write tool to create the Output File as a JSON array of idea objects.
 ```
 
-After each Task() invocation, verify the output file was created:
+**Verify after each type:**
 ```bash
-test -f .auto-build/ideation/<output_filename> && echo "✓ <type> complete" || echo "✗ <type> FAILED"
+test -f <output_dir>/<filename> && echo "✓ <type> complete" || echo "✗ <type> FAILED"
 ```
 
-If a type fails, log the error but CONTINUE with the next type. Do not abort the entire pipeline.
+If a type fails, log it but CONTINUE with the next type.
 
-### Step 3: Aggregate results
+**REQUIRED CHAT OUTPUT — After each type completes (success or fail):**
 
-After all types complete, read each `*_ideas.json` file and produce a summary.
+Read the type's output file and print every idea in detail to the chat:
 
-```bash
-echo "================================================"
-echo "  ✓ Ideation pipeline complete"
-echo "================================================"
-echo ""
-ls -la .auto-build/ideation/
-echo ""
+```markdown
+## 💡 <Type Name> — <count> ideas
 
-# Per-type summary
-python3 - <<EOF
-import json, os, glob
-total = 0
-print("Ideas generated per type:")
-for f in sorted(glob.glob(".auto-build/ideation/*_ideas.json")):
-    try:
-        with open(f) as fp:
-            data = json.load(fp)
-        ideas = data if isinstance(data, list) else data.get("ideas", [])
-        n = len(ideas)
-        total += n
-        print(f"  {os.path.basename(f):42s} {n} ideas")
-    except Exception as e:
-        print(f"  {os.path.basename(f):42s} ERROR: {e}")
-print()
-print(f"TOTAL: {total} ideas")
-EOF
+[For each idea:]
+
+### <idea.id>: <idea.title>  ·  effort=<estimated_effort>
+
+**Description**: <description>
+
+**Rationale**: <rationale>
+
+**Builds upon**: <builds_upon array>
+
+**Affected files**: <affected_files array>
+
+**Existing patterns to follow**: <existing_patterns>
+
+**Implementation approach**: <implementation_approach>
+
+---
 ```
 
-### Step 4: Optional — write a combined ideas.json
+Print every field for every idea. The user wants the content in chat context, not just the file.
 
-After step 3, create a combined `ideas.json` that merges all 6 outputs into a single file with type labels for easy filtering:
+If the type FAILED, print:
+```markdown
+## ⚠️ <Type Name> — FAILED
+The subagent did not produce <filename>. Continuing with the next type.
+```
+
+### Step 3: Combined ideas.json
+
+After all types complete, create the combined file:
 
 ```bash
 python3 - <<EOF
@@ -137,7 +140,8 @@ combined = {
 }
 for f in sorted(glob.glob(".auto-build/ideation/*_ideas.json")):
     type_name = os.path.basename(f).replace("_ideas.json", "")
-    if type_name == "ideas": continue
+    if type_name == "ideas":
+        continue
     try:
         with open(f) as fp:
             data = json.load(fp)
@@ -155,17 +159,33 @@ print(f"Combined: .auto-build/ideation/ideas.json — {sum(combined['types'].val
 EOF
 ```
 
-## Critical Rules
+### Step 4: Final summary in chat
 
-1. **Run types SEQUENTIALLY, not in parallel** — opencode handles one Task() at a time and parallel runs may cause rate limit issues
-2. **Don't abort on individual failures** — if one type fails, continue with the others
-3. **Use the Task tool to invoke subagents** (not direct prompts)
-4. **Verify file existence** after each Task() before moving to the next
-5. **Pass the EXACT context block** shown above to each subagent
+Print one final markdown summary:
 
-## Output
+```markdown
+## 📊 Ideation pipeline complete
 
-When complete, the user will have:
+### Per-type breakdown
+- **Code improvements**: <count> ideas
+- **Code quality**: <count> ideas
+- **Documentation**: <count> ideas
+- **Performance**: <count> ideas
+- **Security**: <count> ideas
+- **UI/UX**: <count> ideas
+
+**Total**: <sum> ideas
+
+### Top 10 by effort/impact
+
+[Sort all ideas by estimated_effort (trivial first) and present 10 candidates as quick wins:]
+
+| # | Type | Title | Effort |
+|---|------|-------|--------|
+| 1 | <type> | <title> | <effort> |
+| ... |
+
+### Files written
 - `.auto-build/ideation/code_improvements_ideas.json`
 - `.auto-build/ideation/code_quality_ideas.json`
 - `.auto-build/ideation/documentation_gaps_ideas.json`
@@ -173,12 +193,21 @@ When complete, the user will have:
 - `.auto-build/ideation/security_hardening_ideas.json`
 - `.auto-build/ideation/ui_ux_improvements_ideas.json`
 - `.auto-build/ideation/ideas.json` (combined)
+```
+
+## Critical rules
+
+1. **PRINT EVERY IDEA IN FULL TO THE CHAT** — every field, no abbreviation. The user needs the content in conversation context for follow-up questions.
+2. Run types **SEQUENTIALLY** — opencode handles one Task() at a time.
+3. **Don't abort on individual failures** — log and continue.
+4. Use the Task tool to invoke subagents.
+5. After printing each type's ideas, briefly state "<Type> complete — proceeding to <Next>" before moving on.
 
 ## Examples
 
 ```
-/ideation                                # all 6 types, 5 ideas each = up to 30 ideas
-/ideation security performance           # only those 2 = up to 10 ideas
-/ideation --max=10                       # all 6 types, 10 ideas each = up to 60 ideas
-/ideation security --max=8               # only security, 8 ideas
+/ideation                                # all 6 types, 5 ideas each
+/ideation security performance           # 2 types only
+/ideation --max=10                       # all 6 types, 10 ideas each
+/ideation security --max=8               # security only, 8 ideas
 ```

@@ -1,42 +1,40 @@
 ---
-description: Generate a comprehensive product roadmap for the current project. Runs Discovery → Competitor Analysis → Features → Critic Refinement.
+description: Generate a comprehensive product roadmap for the current project. Runs Discovery → Competitor Analysis → Features → Critic Refinement, and PRINTS each phase's output in detail in the chat.
 agent: build
 ---
 
 # /roadmap — Generate Product Roadmap
 
-You are the orchestrator for a comprehensive 4-phase roadmap generation pipeline.
+You are the orchestrator for a 4-phase roadmap generation pipeline. **CRITICAL CHAT-OUTPUT RULE**: after every phase completes, you MUST print the phase's output in detail in the chat (not just "done"). The user wants the content in the conversation context for follow-up questions, not just files on disk.
 
 ## Configuration
 
 Project directory: `!`pwd``
 Output directory: `!`pwd`/.auto-build/roadmap`
 
-If the user passed an argument as a project path, use `$ARGUMENTS` instead.
+If the user passed an argument as a project path, use `$ARGUMENTS` instead. Skip competitor analysis if `$ARGUMENTS` contains `--no-competitor`.
 
-Skip competitor analysis if `$ARGUMENTS` contains `--no-competitor`.
+## Path variables
 
-## Workflow — execute strictly in order
-
-### Step 1: Setup
-
-Create the output directory if it doesn't exist:
-```bash
-mkdir -p .auto-build/roadmap
-```
-
-Set these paths in your context:
-- `<project_dir>` = current working directory (or $ARGUMENTS if a path is given)
+- `<project_dir>` = current working directory (or `$ARGUMENTS` if a path is given)
 - `<output_dir>` = `<project_dir>/.auto-build/roadmap`
 - `<discovery_file>` = `<output_dir>/roadmap_discovery.json`
 - `<competitor_file>` = `<output_dir>/competitor_analysis.json`
 - `<roadmap_file>` = `<output_dir>/roadmap.json`
 
+## Workflow — execute strictly in order
+
+### Step 1: Setup
+
+```bash
+mkdir -p .auto-build/roadmap
+```
+
 ---
 
 ### Step 2: Phase 1 — Discovery
 
-Invoke the **roadmap-discovery** subagent using the Task tool. Pass it this context:
+Invoke the **roadmap-discovery** subagent using the Task tool with this context:
 
 ```
 Project Directory: <project_dir>
@@ -55,30 +53,83 @@ DEPTH REQUIREMENTS:
 - competitive_context.alternatives: at least 5 named competitors
 - constraints.technical: at least 3 specific constraints
 
-Use the Write tool to create the file. Do NOT just print JSON.
+Use the Write tool to create the file.
 ```
 
-**Wait for the subagent to complete.** Then verify the file exists:
+**Verify:**
 ```bash
-test -f <output_dir>/roadmap_discovery.json && echo "✓ Discovery complete" || echo "✗ Discovery FAILED"
+test -f <discovery_file> && echo "✓ Discovery complete" || { echo "✗ Discovery FAILED"; exit 1; }
 ```
 
-If the file is missing, abort with an error message.
+**REQUIRED CHAT OUTPUT — Print after Phase 1 completes:**
+
+Read `<discovery_file>` and print its contents to the chat in markdown format. Do NOT skip this. Format:
+
+```markdown
+## 📋 Phase 1 — Discovery
+
+**Project**: <project_name>  ·  **Type**: <project_type>  ·  **Maturity**: <maturity>
+
+### Tech stack
+- Primary language: <primary_language>
+- Frameworks: <frameworks>
+- Key dependencies: <key_dependencies>
+
+### Target audience
+**Primary persona**: <primary_persona>
+
+**Secondary personas**:
+- <each persona>
+
+**Pain points** (<count>):
+- <each pain point>
+
+**Goals**:
+- <each goal>
+
+**Usage context**: <usage_context>
+
+### Product vision
+- **One-liner**: <one_liner>
+- **Problem statement**: <problem_statement>
+- **Value proposition**: <value_proposition>
+- **Success metrics**: <each metric>
+
+### Current state
+**Existing features** (<count>):
+- <each existing feature>
+
+**Known gaps**:
+- <each gap>
+
+**Technical debt**:
+- <each item>
+
+### Competitive context
+- **Alternatives**: <each>
+- **Differentiators**: <each>
+- **Market position**: <market_position>
+
+### Constraints
+- **Technical**: <each>
+- **Resources**: <each>
+- **Dependencies**: <each>
+```
+
+Print every field. Do not abbreviate.
 
 ---
 
 ### Step 3: Phase 2 — Competitor Analysis (skip if `--no-competitor`)
 
-If skipping, jump to Step 4.
-
-Invoke the **competitor-analysis** subagent using the Task tool. Pass it this context:
+Invoke **competitor-analysis** subagent with this context:
 
 ```
 Discovery File: <discovery_file>
 Output Directory: <output_dir>
 Output File: <competitor_file>
 
-Read the discovery JSON, then research 5 competitors using the WebSearch tool. Find real pain points from GitHub Issues, forums, reviews, and documentation. Write the competitor analysis JSON.
+Read the discovery JSON, then research 5 competitors using the WebSearch tool. Find real pain points from GitHub Issues, forums, reviews, and documentation.
 
 DEPTH REQUIREMENTS:
 - Identify exactly 5 competitors (at least 3 with relevance:high)
@@ -89,117 +140,205 @@ DEPTH REQUIREMENTS:
 - insights_summary.differentiator_opportunities: at least 4 opportunities
 - Use WebSearch extensively (minimum 5 searches)
 
-Use the Write tool to create the file.
+Use the Write tool.
 ```
 
-Wait, then verify:
+**Verify:**
 ```bash
-test -f <output_dir>/competitor_analysis.json && echo "✓ Competitor complete" || echo "✗ Competitor FAILED"
+test -f <competitor_file> && echo "✓ Competitor complete" || { echo "✗ Competitor FAILED"; exit 1; }
 ```
+
+**REQUIRED CHAT OUTPUT — Print after Phase 2:**
+
+Read `<competitor_file>` and print in markdown:
+
+```markdown
+## 🔍 Phase 2 — Competitor Analysis
+
+**Competitors analyzed**: <count> · **Pain points found**: <total> · **Market gaps**: <count>
+
+### Competitors
+
+#### 1. <name> (<relevance>)
+- **URL**: <url>
+- **Position**: <market_position>
+- **Description**: <description>
+- **Strengths**: <each>
+- **Pain points** (<count>):
+  - **[<severity>]** <description>
+    - Source: <source>
+    - Frequency: <frequency>
+    - Opportunity: <opportunity>
+
+[repeat for each competitor]
+
+### Market gaps
+- **[<opportunity_size>]** <description>
+  - Affects: <affected_competitors>
+  - Suggested feature: <suggested_feature>
+
+[repeat for each gap]
+
+### Cross-competitor insights
+**Top pain points**:
+- <each>
+
+**Differentiator opportunities**:
+- <each>
+
+**Market trends**:
+- <each>
+```
+
+Print every competitor with all pain points and sources. Do not abbreviate.
 
 ---
 
 ### Step 4: Phase 3 — Features Generation
 
-Invoke the **roadmap-features** subagent using the Task tool. Pass it this context:
+Invoke **roadmap-features** with this context:
 
 ```
 Discovery File: <discovery_file>
-Competitor Analysis File: <competitor_file> (may not exist if skipped)
+Competitor Analysis File: <competitor_file> (may not exist)
 Output Directory: <output_dir>
 Output File: <roadmap_file>
 
-Read the discovery and competitor data. Generate a comprehensive roadmap with prioritized features using MoSCoW. Write the roadmap JSON.
+Read discovery and competitor data. Generate a roadmap with prioritized features using MoSCoW.
 
 DEPTH REQUIREMENTS:
-- Generate AT LEAST 12 features (target 15-20)
+- AT LEAST 12 features (target 15-20)
 - 4 phases (Foundation, Enhancement, Enterprise, Scale)
 - Each phase: 2-3 milestones
 - Each feature MUST have:
-  * acceptance_criteria: at least 6 specific, testable items (HTTP codes, timeouts, algorithms, exact thresholds)
-  * user_stories: at least 3 stories in "As a X, I want Y so that Z" format
-  * rationale: at least 2 sentences linking to specific competitor pain points or discovery insights
+  * acceptance_criteria: at least 6 specific testable items (HTTP codes, timeouts, algorithms)
+  * user_stories: at least 3 stories ("As a X, I want Y so that Z")
+  * rationale: at least 2 sentences linking to specific competitor pain points
   * competitor_insight_ids: array referencing IDs from competitor_analysis.json
 - Priorities: at least 3 must, 4 should, 4 could
 - Be SPECIFIC: numbers, protocols, algorithms, exact behaviors
 
-Use the Write tool to create the file.
+Use the Write tool.
 ```
 
-Wait, then verify:
+**Verify:**
 ```bash
-test -f <output_dir>/roadmap.json && echo "✓ Features complete" || echo "✗ Features FAILED"
+test -f <roadmap_file> && echo "✓ Features complete" || { echo "✗ Features FAILED"; exit 1; }
 ```
+
+**REQUIRED CHAT OUTPUT — Print after Phase 3:**
+
+Read `<roadmap_file>` and print every feature in detail:
+
+```markdown
+## 🎯 Phase 3 — Features (initial pass)
+
+**Features**: <count> · **Phases**: <count>
+
+### Phase breakdown
+- **<phase_name>** (<feature_count> features) — <description>
+  - Milestones: <each milestone title>
+
+[repeat for each phase]
+
+### Features
+
+#### <feature_id>: <title>  ·  [<priority>] complexity=<complexity> impact=<impact>
+**Phase**: <phase_id>
+
+**Description**: <description>
+
+**Rationale**: <rationale>
+
+**Acceptance criteria** (<count>):
+- <each AC>
+
+**User stories**:
+- <each user story>
+
+**Linked competitor insights**: <competitor_insight_ids>
+
+**Dependencies**: <dependencies if any>
 
 ---
 
-### Step 5: Phase 4 — Critic + Refinement
+[repeat for each feature]
+```
 
-Invoke the **roadmap-critic** subagent using the Task tool. Pass it this context:
+Print every feature with full content. The user wants the data in the chat, not just in the file.
+
+---
+
+### Step 5: Phase 4 — Critic Refinement
+
+Invoke **roadmap-critic** with this context:
 
 ```
 Discovery File: <discovery_file>
 Competitor Analysis File: <competitor_file>
-Roadmap File: <roadmap_file> (this is what you'll review and improve)
+Roadmap File: <roadmap_file>
 Output Directory: <output_dir>
 
-Read the current roadmap, identify the 3-5 weakest features, and rewrite the roadmap with deeper specificity. Add missing features if total < 15. Maintain the exact schema. Document changes in metadata.critic_review.
+Read the current roadmap, identify the 3-5 weakest features, rewrite the roadmap with deeper specificity. Add missing features if total < 15. Maintain the schema. Document changes in metadata.critic_review.
 
 Use the Write tool to overwrite roadmap.json.
+```
+
+**REQUIRED CHAT OUTPUT — Print after Phase 4:**
+
+Read the updated `<roadmap_file>` and print:
+
+```markdown
+## ✨ Phase 4 — After Critic Refinement
+
+### Changes from critic
+- **Weak features strengthened**: <list from metadata.critic_review.weak_features_strengthened>
+- **Features added**: <list from metadata.critic_review.features_added>
+- **Key improvements**: <list from metadata.critic_review.key_improvements>
+
+### Final feature list
+
+[Print every feature again with the same structure as Phase 3 — full content, no abbreviation]
 ```
 
 ---
 
 ### Step 6: Final summary
 
-Print a summary using bash:
 ```bash
 echo "================================================"
-echo "  ✓ Roadmap generation complete"
+echo "  ✓ /roadmap pipeline complete"
 echo "================================================"
-echo ""
-ls -la <output_dir>/
-echo ""
-# Quick stats from roadmap.json
-node -e "
-const r = JSON.parse(require('fs').readFileSync('<roadmap_file>', 'utf-8'));
-console.log('Project:', r.project_name);
-console.log('Vision :', (r.vision || '').substring(0, 80));
-console.log('Phases :', (r.phases || []).length);
-console.log('Features:', (r.features || []).length);
-const feats = r.features || [];
-const totalAC = feats.reduce((s, f) => s + ((f.acceptance_criteria || []).length), 0);
-const totalUS = feats.reduce((s, f) => s + ((f.user_stories || []).length), 0);
-console.log('Avg AC/feat:', feats.length ? (totalAC/feats.length).toFixed(1) : 0);
-console.log('Avg US/feat:', feats.length ? (totalUS/feats.length).toFixed(1) : 0);
-" 2>/dev/null || python3 -c "
-import json
-r = json.load(open('<roadmap_file>'))
-print('Project:', r.get('project_name'))
-print('Vision :', (r.get('vision') or '')[:80])
-print('Phases :', len(r.get('phases', [])))
-print('Features:', len(r.get('features', [])))
-feats = r.get('features', [])
-ac = sum(len(f.get('acceptance_criteria', [])) for f in feats)
-us = sum(len(f.get('user_stories', [])) for f in feats)
-print(f'Avg AC/feat: {ac/len(feats):.1f}' if feats else 'no features')
-print(f'Avg US/feat: {us/len(feats):.1f}' if feats else 'no features')
-"
+ls -la .auto-build/roadmap/
 ```
 
----
+Then print one final markdown summary:
 
-## Critical Rules
+```markdown
+## 📊 Final summary
 
-1. Run phases STRICTLY in order — each depends on the previous
-2. Verify file existence after each phase before continuing
-3. If a phase fails (file not created), STOP and report the error
-4. Use the Task tool to invoke subagents (not direct prompts)
-5. Each Task call should pass the EXACT context shown above
+- **Project**: <project_name>
+- **Vision**: <vision>
+- **Phases**: <count>
+- **Features**: <count> (must=<n>, should=<n>, could=<n>, won't=<n>)
+- **Avg AC/feature**: <avg>
+- **Avg user stories/feature**: <avg>
 
-## Output
+### Files written
+- `.auto-build/roadmap/roadmap_discovery.json`
+- `.auto-build/roadmap/competitor_analysis.json` (if not skipped)
+- `.auto-build/roadmap/roadmap.json`
 
-When complete, the user will have:
-- `.auto-build/roadmap/roadmap_discovery.json` — project understanding
-- `.auto-build/roadmap/competitor_analysis.json` — competitor insights (if not skipped)
-- `.auto-build/roadmap/roadmap.json` — the final roadmap with prioritized features
+### Top 5 must-have features
+1. <title> — <one-line description>
+2. ...
+```
+
+## Critical rules
+
+1. **PRINT EVERY PHASE'S OUTPUT IN THE CHAT IN FULL** — not summaries, not "done", not "see file". Full content in markdown so the user can ask follow-up questions without re-reading the JSON.
+2. Run phases STRICTLY in order — each depends on the previous.
+3. Verify file existence after each phase. If missing, STOP and report the error.
+4. Use the Task tool to invoke subagents (not direct prompts).
+5. Pass the EXACT context block shown above to each subagent.
+6. After printing each phase's data, briefly state "Phase X complete — proceeding to Phase Y" before moving on.

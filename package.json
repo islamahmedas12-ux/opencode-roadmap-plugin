@@ -1,7 +1,7 @@
 {
   "name": "opencode-roadmap-plugin",
-  "version": "1.1.0",
-  "description": "Generate product roadmaps and improvement ideas in opencode. Adds /roadmap (4-phase pipeline) and /ideation (6 ideation types: code, UI/UX, docs, security, performance, code quality) slash commands.",
+  "version": "1.2.0",
+  "description": "Generate product roadmaps and improvement ideas in opencode. /roadmap and /ideation slash commands print full output in chat (not just JSON files) so the data is in conversation context for follow-up questions.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
