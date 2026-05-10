@@ -1,7 +1,7 @@
 {
   "name": "opencode-roadmap-plugin",
-  "version": "1.0.1",
-  "description": "Generate comprehensive product roadmaps in opencode via a 4-phase pipeline (Discovery → Competitor → Features → Critic). Adds /roadmap slash command and 4 specialized subagents.",
+  "version": "1.1.0",
+  "description": "Generate product roadmaps and improvement ideas in opencode. Adds /roadmap (4-phase pipeline) and /ideation (6 ideation types: code, UI/UX, docs, security, performance, code quality) slash commands.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
