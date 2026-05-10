@@ -1,6 +1,6 @@
 {
   "name": "opencode-roadmap-plugin",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Generate comprehensive product roadmaps in opencode via a 4-phase pipeline (Discovery → Competitor → Features → Critic). Adds /roadmap slash command and 4 specialized subagents.",
   "type": "module",
   "main": "./dist/index.js",
@@ -20,9 +20,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
-    "prepare": "true",
-    "prepublishOnly": "npm run build"
+    "build": "tsc"
   },
   "keywords": [
     "opencode",
@@ -44,14 +42,6 @@
     "url": "https://github.com/islamahmedas12-ux/opencode-roadmap-plugin/issues"
   },
   "homepage": "https://github.com/islamahmedas12-ux/opencode-roadmap-plugin#readme",
-  "peerDependencies": {
-    "@opencode-ai/plugin": "^1.0.0"
-  },
-  "devDependencies": {
-    "@opencode-ai/plugin": "^1.14.46",
-    "@types/node": "^22.0.0",
-    "typescript": "^5.5.0"
-  },
   "engines": {
     "node": ">=20.0.0"
   }
